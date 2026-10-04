@@ -1,51 +1,44 @@
 
-import math
+from sqlalchemy import text
+from app.database import engine
 
 
-def cosine_similarity(vector_a, vector_b):
-    """Calculate cosine similarity between two vectors."""
+def search_with_pgvector(query_embedding, document_id, top_k=3):
+    """Return the top matching chunks using Supabase pgvector."""
 
-    if len(vector_a) != len(vector_b):
-        raise ValueError("Vectors must have the same dimensions")
+    if not 1 <= top_k <= 20:
+        raise ValueError("top_k must be between 1 and 20")
 
-    dot_product = sum(
-        a * b for a, b in zip(vector_a, vector_b)
-    )
+    # Convert the embedding list into pgvector's string format.
+    embedding_text = "[" + ",".join(
+        str(float(value)) for value in query_embedding
+    ) + "]"
 
-    magnitude_a = math.sqrt(
-        sum(a * a for a in vector_a)
-    )
+    sql = text("""
+        SELECT id, page, content, similarity
+        FROM match_document_chunks(
+            CAST(:query_embedding AS extensions.vector),
+            CAST(:document_id AS UUID),
+            :match_count
+        )
+    """)
 
-    magnitude_b = math.sqrt(
-        sum(b * b for b in vector_b)
-    )
-
-    if magnitude_a == 0 or magnitude_b == 0:
-        return 0.0
-
-    return dot_product / (magnitude_a * magnitude_b)
-
-
-def search_documents(query_embedding, documents, top_k=3):
-    """Return the top matching chunks for a query."""
-
-    results = []
-
-    for document in documents:
-        score = cosine_similarity(
-            query_embedding,
-            document["embedding"]
+    with engine.connect() as connection:
+        result = connection.execute(
+            sql,
+            {
+                "query_embedding": embedding_text,
+                "document_id": str(document_id),
+                "match_count": top_k
+            }
         )
 
-        results.append({
-            "page": document["page"],
-            "text": document["text"],
-            "score": round(score, 4)
-        })
-
-    results.sort(
-        key=lambda item: item["score"],
-        reverse=True
-    )
-
-    return results[:top_k]
+        return [
+            {
+                "document_id": str(document_id),
+                "page": row.page,
+                "text": row.content,
+                "score": round(float(row.similarity), 4)
+            }
+            for row in result
+        ]
