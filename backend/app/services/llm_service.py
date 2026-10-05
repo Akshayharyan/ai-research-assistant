@@ -3,8 +3,6 @@ import json
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from opentelemetry import context
-
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "qwen2.5:1.5b"
@@ -32,17 +30,9 @@ Never return unlabeled numbers for a comparison.
 - Match each measurement to its stated group.
 - If table rows and prose appear inconsistent, report the inconsistency.
 - Never guess which value belongs to a group.
-context = 
-Verified facts from Page 1:
-- Roof type: Rooftop garden
-  Mean indoor temperature: 27.1 °C
-- Roof type: Conventional roof
-  Mean indoor temperature: 29.4 °C
 
-The results section confirms:
-Rooftop gardens: 27.1 °C.
-Conventional roofs: 29.4 °C.
-
+Context:
+{context}
 
 Question:
 {question}
